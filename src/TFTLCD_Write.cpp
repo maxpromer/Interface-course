@@ -96,7 +96,7 @@ void setup() {
   Serial.begin(115200);
   
   SPI.begin(LCD_SCK_PIN, LCD_MISO_PIN, LCD_MOSI_PIN, -1);
-  SPI.setFrequency(10E6); // 1 MHz
+  SPI.setFrequency(1E6); // 1 MHz
   SPI.setDataMode(SPI_MODE0);
   SPI.setBitOrder(SPI_MSBFIRST);
   

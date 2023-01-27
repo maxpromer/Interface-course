@@ -1,5 +1,8 @@
 #ifdef TFTLCD_WRITE
 
+// Ref: https://www.displayfuture.com/Display/datasheet/controller/ST7735.pdf
+// https://github.com/bersch/ST7735S/blob/master/st7735s.c
+
 #include <Arduino.h>
 #include <SPI.h>
 
@@ -283,8 +286,7 @@ void fill_screen(uint16_t color) {
     LCD_write_data(color >> 8);
     LCD_write_data(color & 0xFF);
     */
-    SPI.transfer(color >> 8);
-    SPI.transfer(color & 0xFF);
+    SPI.write16(color);
   }
   LCD_INACTIVE();
 }

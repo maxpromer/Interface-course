@@ -2,30 +2,6 @@
 
 #include <Arduino.h>
 
-int PM_SP_UG_1_0, PM_SP_UG_2_5, PM_SP_UG_10_0;
-int PM_AE_UG_1_0, PM_AE_UG_2_5, PM_AE_UG_10_0;
-
-#define PMS Serial2
-
-bool pms_process() ;
-
-void setup() {
-  Serial.begin(115200);
-  PMS.begin(9600, SERIAL_8N1, 27, -1);
-  PMS.setTimeout(100);
-
-  Serial.println("PM2.5 Sensor");
-}
-
-void loop() {
-  if (pms_process()) {
-    Serial.print("PM2.5: ");
-    Serial.println(PM_AE_UG_2_5);
-  }
-
-  delay(10);
-}
-
 typedef struct {
   uint8_t start1;
   uint8_t start2;
@@ -34,49 +10,42 @@ typedef struct {
   uint16_t check_swap;
 } PMS7003_Packet_t;
 
-uint16_t swap(uint16_t in) {
-  return ((in >> 8) & 0xFF) | ((in & 0xFF) << 8);
+uint16_t swap(uint16_t data) {
+  return (data >> 8) | (data << 8);
 }
 
-bool pms_process() {
+void setup() {
+  Serial.begin(115200);
+  Serial2.begin(9600, SERIAL_8N1, 4, -1);
+  Serial2.setTimeout(100);
+}
+
+void loop() {
   PMS7003_Packet_t packet;
-  memset(&packet, 0, sizeof(packet));
-  int n = PMS.readBytes((uint8_t*) &packet, sizeof(packet));
-  if (n != sizeof(packet)) {
-    return false;
-  }
-  
-  // Check start character
-  if ((packet.start1 != 0x42) || (packet.start2 != 0x4d)) {
-    Serial.println("invaild start character");
-    return false;
-  }
+  int n = Serial2.readBytes((uint8_t*) &packet, sizeof(packet));
+  if (n == sizeof(packet)) {
+    if ((packet.start1 == 0x42) && (packet.start2 == 0x4d)) {
+      if (swap(packet.frame_length_swap) == 2 * 13 + 2) {
+        uint16_t sum = 0;
+        for (int i=0;i<30;i++) {
+          sum += ((uint8_t*)(&packet))[i];
+        }
+        if (swap(packet.check_swap) == sum) {
+          uint16_t pm1_0 = swap(packet.data_swap[0]);
+          uint16_t pm2_5 = swap(packet.data_swap[1]);
+          uint16_t pm10_0 = swap(packet.data_swap[2]);
 
-  // Check frame length
-  if (swap(packet.frame_length_swap) != ((2 * 13) + 2)) { // Datasheet page.13
-    Serial.println("invaild frame length");
-    return false;
+          Serial.printf("PM1.0: %d\tPM2.5: %d\tPM10.0: %d\n", pm1_0, pm2_5, pm10_0);
+        } else {
+          Serial.println("chack invaild");
+        }
+      } else {
+        Serial.println("frame length invaild");
+      }
+    } else {
+      Serial.println("start packet invaild");
+    }
   }
-
-  // Checksum
-  uint16_t check = 0;
-  for (uint8_t i=0;i<(sizeof(packet) - 2);i++) {
-    check += ((uint8_t*)(&packet))[i];
-  }
-  if (check != swap(packet.check_swap)) {
-    Serial.println("invaild check word");
-    return false;
-  }
-
-  PM_SP_UG_1_0 = swap(packet.data_swap[0]);
-  PM_SP_UG_2_5 = swap(packet.data_swap[1]);
-  PM_SP_UG_10_0 = swap(packet.data_swap[2]);
-
-  PM_AE_UG_1_0 = swap(packet.data_swap[3]);
-  PM_AE_UG_2_5 = swap(packet.data_swap[4]);
-  PM_AE_UG_10_0 = swap(packet.data_swap[5]);
-
-  return true;
 }
 
 #endif
